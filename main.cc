@@ -28,6 +28,7 @@ int main() {
 	hittable_list world;
 	world.add(std::make_shared<sphere>(sphere(point3(1, 1, 1), 1)));
 	world.add(std::make_shared<sphere>(sphere(point3(5, 5, 5), 2)));
+	world.add(std::make_shared<sphere>(sphere(point3(5, 5, 6), 2)));
 	int screen_width = 200; 
 	int screen_height = 113;
 	camera cam(screen_width, screen_height);

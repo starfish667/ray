@@ -86,7 +86,7 @@ public:
 	}
 	color ray_color(hittable_list& world, const ray& r) {
 		hit_record hr;
-		if(world.hit(r, interval(0, infinity), hr))return color(0, 0, 1);
+		if(world.hit(r, interval(0, infinity), hr))return (hr.normal+vec3(1, 1, 1))/2;
 		return color(0, 0, 0);
 	}
 	void render(hittable_list& world, float offset = 0.0f) {
@@ -106,7 +106,7 @@ public:
 		for(int y = 0; y < height; y++) {
 			for(int x = 0; x < width; x++) {
 				point3 pixel = pixel00 + pixel_delta_u*x + pixel_delta_v*y;
-				mat[y][x]=ray_color(world, ray(pixel, pixel-position));
+				mat[y][x]=ray_color(world, ray(position, pixel-position));
 			}
 		}
 	}
