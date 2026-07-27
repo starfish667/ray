@@ -1,0 +1,7 @@
+*.exe
+*.o
+*.obj
+*.pdb
+*.ilk
+*.log
+ray_window_startup_error.txt
