@@ -1,5 +1,6 @@
 #ifndef VEC3_H
 #define VEC3_H
+#include"rtweekend.h"
 #include<cmath>
 #include<iostream>
 class vec3 {
@@ -48,12 +49,22 @@ public:
 		e[2]/=x;
 		return (*this);
 	}
-	double mag() {
+	double mag() const {
 		return std::sqrt(e[0]*e[0]+e[1]*e[1]+e[2]*e[2]);
 	}
 	vec3& normalize() {
 		double mag=(this->mag());
 		return (*this)/=mag;
+	}
+	static vec3 random() {
+		return vec3(random_double(), random_double(), random_double());
+	}
+	static vec3 random(double min, double max) {
+		return vec3(random_double(min, max), random_double(min, max), random_double(min, max));
+	}
+	bool near_zero() const {
+		double eps=1e-8;
+		return (fabs(e[0])<eps) && (fabs(e[1])<eps) && (fabs(e[2])<eps);
 	}
 };
 std::ostream& operator<<(std::ostream& out, const vec3& v) {
@@ -84,6 +95,24 @@ vec3 cross(const vec3& e, const vec3& f) {
 	return vec3(e[1]*f[2]-e[2]*f[1], 
 				e[2]*f[0]-e[0]*f[2], 
 				e[0]*f[1]-e[1]*f[0]);
+}
+vec3 random_in_unit_sphere() {
+	double r=random_double();
+	double yaw=random_double(0, 2*pi);
+	double pitch=random_double(-pi/2, pi/2);
+	using std::sin, std::cos;
+	return vec3(r*cos(pitch)*cos(yaw), r*cos(pitch)*sin(yaw), r*sin(pitch));
+}
+vec3 unit_vector(const vec3& v) {
+	return v/v.mag();
+}
+vec3 random_unit_vector() {
+	return unit_vector(vec3::random(-1, 1));
+}
+vec3 random_on_hemisphere(const vec3& normal) {
+	vec3 v=random_unit_vector();
+	if(dot(v, normal))return v;
+	return -v;
 }
 typedef vec3 point3;
 #endif

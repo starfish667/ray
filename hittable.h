@@ -2,12 +2,15 @@
 #define HITTABLE_H
 #include"ray.h"
 #include"interval.h"
+#include"rtweekend.h"
+class material;
 class hit_record {
 public:
 	point3 hit_point;
 	double t;
 	vec3 normal;
 	bool front_face;
+	std::shared_ptr<material>mat;
 	void set_normal(const ray& r, const vec3& outward_normal) {
 		if(dot(r.direction(), outward_normal)<0)
 			front_face=true, normal=outward_normal;

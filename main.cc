@@ -3,9 +3,12 @@
 #include <thread>
 #include <iomanip>
 #include <sstream>
+#include <ctime>
+#include "plane.h"
 #include "sphere.h"
 #include "camera.h"
 #include "app_window.h"
+#include "material.h"
 
 std::string debug_title(const camera& cam) {
 	std::ostringstream title;
@@ -25,10 +28,18 @@ std::string debug_title(const camera& cam) {
 }
 
 int main() {
+	std::srand(static_cast<unsigned>(std::time(nullptr)));
 	hittable_list world;
-	world.add(std::make_shared<sphere>(sphere(point3(1, 1, 1), 1)));
-	world.add(std::make_shared<sphere>(sphere(point3(5, 5, 5), 2)));
-	world.add(std::make_shared<sphere>(sphere(point3(5, 5, 6), 2)));
+	world.add(std::make_shared<sphere>(sphere(point3(-1, -1, -1), 1.0, 
+											  std::make_shared<lambertian>(lambertian(color(0, 0, 1))))));
+	world.add(std::make_shared<sphere>(sphere(point3(-5, -1, -2), 1.0, 
+											  std::make_shared<lambertian>(lambertian(color(1, 0, 1))))));
+	world.add(std::make_shared<sphere>(sphere(point3(-5, -6, -3), 1.0, 
+											  std::make_shared<lambertian>(lambertian(color(0, 1, 1))))));
+	world.add(std::make_shared<sphere>(sphere(point3(-20, -1, -10), 1.0, 
+											  std::make_shared<lambertian>(lambertian(color(0, 1, 0))))));
+	
+//	world.add(std::make_shared<plane>(plane(vec3(0.1, 2, 0.1), 2.2)));
 	int screen_width = 200; 
 	int screen_height = 113;
 	camera cam(screen_width, screen_height);
