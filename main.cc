@@ -41,8 +41,8 @@ int main() {
 	// world.add(std::make_shared<plane>(plane(vec3(0.1, 2, 0.1), 2.2, 
 										// std::make_shared<lambertian>(lambertian(color(0.5, 0.7, 0.2))))));
 //	world.add(std::make_shared<plane>(plane(vec3(0.1, 2, 0.1), 2.2)));
-	int screen_width = 200; 
-	int screen_height = 113;
+	int screen_width = 400; 
+	int screen_height = 225;
 	int pixel_scale = 6;
 	camera cam(screen_width, screen_height);
 	app_window window(screen_width, screen_height, pixel_scale);

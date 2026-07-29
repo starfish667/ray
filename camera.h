@@ -135,7 +135,6 @@ public:
 		return pixel_color;
 	}
 	void render(hittable_list& world, float offset = 0.0f) {
-		(void)offset;
 //		for(int y = 0; y < height; y++) {
 //			for(int x = 0; x < width; x++) {
 //				mat[y][x][0] = std::fmod((1.0 * y / height) + offset, 1.0);
