@@ -1,6 +1,5 @@
 #include <iostream>
 #include <chrono>
-#include <thread>
 #include <iomanip>
 #include <sstream>
 #include <ctime>
@@ -29,21 +28,24 @@ std::string debug_title(const camera& cam) {
 
 int main() {
 	std::srand(static_cast<unsigned>(std::time(nullptr)));
-	hittable_list world;
-	world.add(std::make_shared<sphere>(sphere(point3(-1, -1, -1), 1.0, 
-											  std::make_shared<lambertian>(lambertian(color(0, 0, 1))))));
-	world.add(std::make_shared<sphere>(sphere(point3(-5, -1, -2), 1.0, 
-											  std::make_shared<lambertian>(lambertian(color(1, 0, 1))))));
-	world.add(std::make_shared<sphere>(sphere(point3(-5, -6, -3), 1.0, 
-											  std::make_shared<lambertian>(lambertian(color(0, 1, 1))))));
-	world.add(std::make_shared<sphere>(sphere(point3(-20, -1, -10), 1.0, 
-											  std::make_shared<lambertian>(lambertian(color(0, 1, 0))))));
-	
+	hittable_list world;    
+	auto material_ground = make_shared<lambertian>(color(0.8, 0.8, 0.0));
+    auto material_center = make_shared<lambertian>(color(0.7, 0.3, 0.3));
+    auto material_left   = make_shared<metal>(color(0.8, 0.8, 0.8), 0);
+    auto material_right  = make_shared<metal>(color(0.8, 0.6, 0.2), 0.5);
+    world.add(make_shared<sphere>(point3( 0.0, -100.5, -1.0), 100.0, material_ground));
+    world.add(make_shared<sphere>(point3( 0.0,    0.0, -1.0),   0.5, material_center));
+    world.add(make_shared<sphere>(point3(-1.0,    0.0, -1.0),   0.5, material_left));
+    world.add(make_shared<sphere>(point3( 1.0,    0.0, -1.0),   0.5, material_right));
+										// std::make_shared<lambertian>(lambertian(color(0, 1, 0))))));
+	// world.add(std::make_shared<plane>(plane(vec3(0.1, 2, 0.1), 2.2, 
+										// std::make_shared<lambertian>(lambertian(color(0.5, 0.7, 0.2))))));
 //	world.add(std::make_shared<plane>(plane(vec3(0.1, 2, 0.1), 2.2)));
 	int screen_width = 200; 
 	int screen_height = 113;
+	int pixel_scale = 6;
 	camera cam(screen_width, screen_height);
-	app_window window(screen_width, screen_height, 10);
+	app_window window(screen_width, screen_height, pixel_scale);
 	
 	float time_offset = 0.0f;
 	
@@ -74,7 +76,7 @@ int main() {
 		auto timeTaken = std::chrono::duration_cast<std::chrono::milliseconds>(frameEnd - frameStart);
 		
 		if (timeTaken < frameDuration) {
-			std::this_thread::sleep_for(frameDuration - timeTaken);
+			Sleep(static_cast<DWORD>((frameDuration - timeTaken).count()));
 		}
 	}
 	

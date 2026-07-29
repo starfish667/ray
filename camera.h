@@ -122,7 +122,7 @@ public:
 	}
 	color sample_pixel(hittable_list& world, int x, int y) {
 		color pixel_color(0, 0, 0);
-		const int samples_per_pixel=50;
+		const int samples_per_pixel=100;
 		for (int s = 0; s < samples_per_pixel; s++) {
 			ray r = get_ray(x, y);
 			pixel_color += ray_color(world, 3, r);
@@ -135,6 +135,7 @@ public:
 		return pixel_color;
 	}
 	void render(hittable_list& world, float offset = 0.0f) {
+		(void)offset;
 //		for(int y = 0; y < height; y++) {
 //			for(int x = 0; x < width; x++) {
 //				mat[y][x][0] = std::fmod((1.0 * y / height) + offset, 1.0);
