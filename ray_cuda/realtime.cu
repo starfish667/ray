@@ -766,6 +766,34 @@ __device__ bool scatter(
 	return false;
 }
 
+__device__ float schlick_reflectance(float cosine, float refraction_ratio) {
+	float r0 = (1.0f - refraction_ratio) / (1.0f + refraction_ratio);
+	r0 = r0 * r0;
+	float one_minus_cos = 1.0f - cosine;
+	return r0 + (1.0f - r0) * one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos * one_minus_cos;
+}
+
+__device__ Vec3 sky_color(const Ray& r) {
+	Vec3 unit_direction = unit_vector(r.dir);
+	float a = 0.5f * (unit_direction.y + 1.0f);
+	return (1.0f - a) * Vec3(1.0f, 1.0f, 1.0f) + a * Vec3(0.5f, 0.7f, 1.0f);
+}
+
+__device__ Vec3 preview_surface_color(const Ray& r, const HitRecord& rec, const Material* materials) {
+	Material mat = materials[rec.material_id];
+	Vec3 light_dir = unit_vector(Vec3(-0.6f, 1.0f, 0.35f));
+	float diffuse = fmaxf(dot(rec.normal, light_dir), 0.0f);
+	float shade = 0.18f + 0.82f * diffuse;
+
+	if (mat.type == MAT_METAL) {
+		Vec3 reflected = reflect(unit_vector(r.dir), rec.normal);
+		Vec3 reflected_sky = sky_color(Ray(rec.p, reflected));
+		return 0.35f * mat.albedo * shade + 0.65f * mat.albedo * reflected_sky;
+	}
+
+	return mat.albedo * shade;
+}
+
 __device__ Vec3 ray_color(
 	const Ray& start_ray,
 	const Sphere* spheres,
@@ -793,10 +821,47 @@ __device__ Vec3 ray_color(
 			continue;
 		}
 
+		return throughput * sky_color(r);
+	}
+
+	return Vec3(0.0f, 0.0f, 0.0f);
+}
+
+__device__ Vec3 preview_ray_color(
+	const Ray& start_ray,
+	const Sphere* spheres,
+	int sphere_count,
+	const Plane* planes,
+	int plane_count,
+	const Material* materials
+) {
+	Ray r = start_ray;
+	Vec3 throughput(1.0f, 1.0f, 1.0f);
+
+	for (int depth = 0; depth < 6; ++depth) {
+		HitRecord rec;
+		if (!hit_world(spheres, sphere_count, planes, plane_count, r, 0.001f, 1.0e30f, rec)) {
+			return throughput * sky_color(r);
+		}
+
+		Material mat = materials[rec.material_id];
+		if (mat.type != MAT_DIELECTRIC) {
+			return throughput * preview_surface_color(r, rec, materials);
+		}
+
 		Vec3 unit_direction = unit_vector(r.dir);
-		float a = 0.5f * (unit_direction.y + 1.0f);
-		Vec3 sky = (1.0f - a) * Vec3(1.0f, 1.0f, 1.0f) + a * Vec3(0.5f, 0.7f, 1.0f);
-		return throughput * sky;
+		float refraction_ratio = rec.front_face ? (1.0f / mat.refraction_index) : mat.refraction_index;
+		float cos_theta = fminf(dot(-unit_direction, rec.normal), 1.0f);
+		float sin_theta = sqrtf(1.0f - cos_theta * cos_theta);
+		bool cannot_refract = refraction_ratio * sin_theta > 1.0f;
+		float reflectance = schlick_reflectance(cos_theta, refraction_ratio);
+
+		Vec3 direction = (cannot_refract || reflectance > 0.28f)
+			? reflect(unit_direction, rec.normal)
+			: refract(unit_direction, rec.normal, refraction_ratio);
+
+		throughput *= mat.albedo;
+		r = Ray(rec.p, direction);
 	}
 
 	return Vec3(0.0f, 0.0f, 0.0f);
@@ -847,7 +912,8 @@ __global__ void render_kernel(
 	int max_depth,
 	std::uint32_t noise_seed,
 	std::uint32_t accumulated_frames,
-	bool jitter_pixels
+	bool jitter_pixels,
+	bool preview_mode
 ) {
 	int x = blockIdx.x * blockDim.x + threadIdx.x;
 	int y = blockIdx.y * blockDim.y + threadIdx.y;
@@ -859,6 +925,14 @@ __global__ void render_kernel(
 	int pixel_index = y * cam.width + x;
 	uint32_t rng_state = 1973u * uint32_t(x) + 9277u * uint32_t(y) + 26699u * noise_seed + 89173u;
 	xorshift32(rng_state);
+
+	if (preview_mode) {
+		Ray r = get_camera_ray(cam, x, y, rng_state, false);
+		Vec3 current_color = preview_ray_color(r, spheres, sphere_count, planes, plane_count, materials);
+		accumulation[pixel_index] = current_color;
+		pixels[pixel_index] = pack_color(current_color);
+		return;
+	}
 
 	Vec3 pixel_color(0.0f, 0.0f, 0.0f);
 	for (int sample = 0; sample < samples_per_pixel; ++sample) {
@@ -892,13 +966,14 @@ static Plane make_plane(Vec3 normal, float b, int material_id) {
 	return plane;
 }
 
-static std::string make_title(const HostCamera& camera, float fps, int samples_per_pixel, int max_depth, std::uint32_t accumulated_frames) {
+static std::string make_title(const HostCamera& camera, float fps, int samples_per_pixel, int max_depth, std::uint32_t accumulated_frames, bool preview_mode) {
 	std::ostringstream title;
 	title.setf(std::ios::fixed);
 	title.precision(2);
 	title
 		<< "Ray CUDA realtime"
 		<< "  fps: " << fps
+		<< "  mode: " << (preview_mode ? "preview" : "trace")
 		<< "  spp: " << samples_per_pixel
 		<< "  accum: " << accumulated_frames
 		<< "  depth: " << max_depth
@@ -995,6 +1070,7 @@ int main() {
 
 		std::uint32_t frames_before_render = camera_moved ? 0 : accumulated_frames;
 		bool jitter_pixels = !camera_moved;
+		bool preview_mode = camera_moved;
 		std::uint32_t noise_seed = camera_moved ? 1u : frame_index;
 
 		render_kernel<<<grid, block>>>(
@@ -1010,7 +1086,8 @@ int main() {
 			max_depth,
 			noise_seed,
 			frames_before_render,
-			jitter_pixels
+			jitter_pixels,
+			preview_mode
 		);
 
 		CUDA_CHECK(cudaGetLastError());
@@ -1023,7 +1100,7 @@ int main() {
 		float frame_seconds = std::chrono::duration<float>(frame_end - frame_start).count();
 		float fps = frame_seconds > 0.0f ? 1.0f / frame_seconds : 0.0f;
 		accumulated_frames = frames_before_render + 1;
-		window.set_title(make_title(camera, fps, samples_per_pixel, max_depth, accumulated_frames));
+		window.set_title(make_title(camera, fps, samples_per_pixel, max_depth, accumulated_frames, preview_mode));
 
 		++frame_index;
 	}

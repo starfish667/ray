@@ -125,7 +125,7 @@ public:
 		const int samples_per_pixel=100;
 		for (int s = 0; s < samples_per_pixel; s++) {
 			ray r = get_ray(x, y);
-			pixel_color += ray_color(world, 3, r);
+			pixel_color += ray_color(world, 5, r);
 		}
 		
 		pixel_color /= samples_per_pixel;

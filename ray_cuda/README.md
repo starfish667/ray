@@ -22,7 +22,7 @@ build.bat
 - Mouse: look around
 - Esc: quit
 
-The realtime renderer uses temporal accumulation. When the camera is still, the `accum` value in the window title rises and the image becomes cleaner. When you move or turn, accumulation resets and pixel jitter is disabled for a more stable interactive view.
+The realtime renderer has two modes. While moving, it uses a deterministic `preview` mode with no random path scattering, so the image is more stable. When the camera is still, it switches back to `trace` mode; the `accum` value in the window title rises and the image becomes cleaner.
 
 The still-image version is kept in `main.cu`:
 
