@@ -8,6 +8,7 @@ Key differences:
 - GPU code works better with flat arrays: `Sphere[]`, `Plane[]`, and `Material[]`.
 - Each CUDA thread renders one pixel.
 - Recursive path tracing is rewritten as a `for depth` loop.
+- The scene uses a grid of many small spheres with mixed diffuse, metal, and glass materials.
 
 Build and run:
 
@@ -22,7 +23,9 @@ build.bat
 - Mouse: look around
 - Esc: quit
 
-The realtime renderer has two modes. While moving, it uses a deterministic `preview` mode with no random path scattering, so the image is more stable. When the camera is still, it switches back to `trace` mode; the `accum` value in the window title rises and the image becomes cleaner.
+The realtime renderer keeps one path-tracing integrator for both movement and still frames. While moving, it uses fixed RNG, no pixel jitter, and more samples per frame for a steadier image. When the camera is still, jitter returns and the `accum` value in the window title rises as the image converges.
+
+The realtime loop is capped at 240 FPS.
 
 The still-image version is kept in `main.cu`:
 

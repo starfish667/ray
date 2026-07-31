@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdint>
+#include <vector>
 
 struct Vec3 {
 	float x;
@@ -454,6 +455,32 @@ static Plane make_plane(Vec3 normal, float b, int material_id) {
 	return plane;
 }
 
+static std::vector<Sphere> make_sphere_rows() {
+	std::vector<Sphere> spheres;
+	const int columns = 10;
+	const int rows = 5;
+	const float ground_y = -0.5f;
+	const float x_spacing = 0.68f;
+	const float z_spacing = 0.92f;
+	const int material_ids[] = {1, 6, 9, 2, 7, 10, 3, 8, 4, 5};
+
+	spheres.reserve(columns * rows);
+	for (int row = 0; row < rows; ++row) {
+		for (int col = 0; col < columns; ++col) {
+			float radius = 0.12f + 0.035f * float((row * 3 + col * 5) % 6);
+			float row_offset = (row % 2 == 0) ? 0.0f : 0.22f;
+			float x = (float(col) - 0.5f * float(columns - 1)) * x_spacing + row_offset;
+			float y = ground_y + radius;
+			float z = -1.2f - float(row) * z_spacing - 0.08f * float(col % 3);
+			int material_id = material_ids[(col + row * 3) % (sizeof(material_ids) / sizeof(material_ids[0]))];
+
+			spheres.push_back({ Vec3(x, y, z), radius, material_id });
+		}
+	}
+
+	return spheres;
+}
+
 #define CUDA_CHECK(call) \
 	do { \
 		cudaError_t err = (call); \
@@ -466,23 +493,24 @@ static Plane make_plane(Vec3 normal, float b, int material_id) {
 int main() {
 	const int width = 800;
 	const int height = 450;
-	const int samples_per_pixel = 32;
-	const int max_depth = 10;
+	const int samples_per_pixel = 16;
+	const int max_depth = 8;
 
 	Material materials[] = {
 		{ MAT_LAMBERTIAN, Vec3(0.8f, 0.8f, 0.0f), 0.0f, 1.0f },
 		{ MAT_LAMBERTIAN, Vec3(0.7f, 0.3f, 0.3f), 0.0f, 1.0f },
-		{ MAT_METAL, Vec3(0.8f, 0.8f, 0.8f), 0.0f, 1.0f },
-		{ MAT_METAL, Vec3(0.8f, 0.6f, 0.2f), 0.5f, 1.0f },
-		{ MAT_DIELECTRIC, Vec3(1.0f, 1.0f, 1.0f), 0.0f, 1.5f }
+		{ MAT_LAMBERTIAN, Vec3(0.2f, 0.5f, 0.9f), 0.0f, 1.0f },
+		{ MAT_LAMBERTIAN, Vec3(0.2f, 0.8f, 0.35f), 0.0f, 1.0f },
+		{ MAT_LAMBERTIAN, Vec3(0.65f, 0.25f, 0.9f), 0.0f, 1.0f },
+		{ MAT_LAMBERTIAN, Vec3(0.95f, 0.95f, 0.9f), 0.0f, 1.0f },
+		{ MAT_METAL, Vec3(0.8f, 0.8f, 0.85f), 0.0f, 1.0f },
+		{ MAT_METAL, Vec3(0.95f, 0.72f, 0.25f), 0.18f, 1.0f },
+		{ MAT_METAL, Vec3(0.8f, 0.45f, 0.28f), 0.45f, 1.0f },
+		{ MAT_DIELECTRIC, Vec3(1.0f, 1.0f, 1.0f), 0.0f, 1.5f },
+		{ MAT_DIELECTRIC, Vec3(0.9f, 0.98f, 1.0f), 0.0f, 1.33f }
 	};
 
-	Sphere spheres[] = {
-		{ Vec3(0.0f, 0.0f, -1.0f), 0.5f, 1 },
-		{ Vec3(-1.0f, 0.0f, -1.0f), 0.5f, 2 },
-		{ Vec3(1.0f, 0.0f, -1.0f), 0.5f, 3 },
-		{ Vec3(0.0f, 0.05f, -0.45f), 0.22f, 4 }
-	};
+	std::vector<Sphere> spheres = make_sphere_rows();
 
 	Plane planes[] = {
 		make_plane(Vec3(0.0f, 1.0f, 0.0f), 0.5f, 0)
@@ -491,10 +519,10 @@ int main() {
 	CameraData cam;
 	cam.width = width;
 	cam.height = height;
-	cam.position = Vec3(0.0f, 0.0f, 0.0f);
-	cam.forward = Vec3(0.0f, 0.0f, -1.0f);
+	cam.position = Vec3(0.0f, 1.2f, 2.6f);
+	cam.forward = unit_vector(Vec3(0.0f, -0.28f, -1.0f));
 	cam.right = Vec3(1.0f, 0.0f, 0.0f);
-	cam.up = Vec3(0.0f, 1.0f, 0.0f);
+	cam.up = unit_vector(Vec3(0.0f, 1.0f, -0.28f));
 	cam.viewport_height = 2.0f;
 	cam.viewport_width = cam.viewport_height * float(width) / float(height);
 
@@ -505,11 +533,11 @@ int main() {
 	Material* device_materials = nullptr;
 
 	CUDA_CHECK(cudaMalloc(&device_framebuffer, sizeof(Vec3) * width * height));
-	CUDA_CHECK(cudaMalloc(&device_spheres, sizeof(spheres)));
+	CUDA_CHECK(cudaMalloc(&device_spheres, sizeof(Sphere) * spheres.size()));
 	CUDA_CHECK(cudaMalloc(&device_planes, sizeof(planes)));
 	CUDA_CHECK(cudaMalloc(&device_materials, sizeof(materials)));
 
-	CUDA_CHECK(cudaMemcpy(device_spheres, spheres, sizeof(spheres), cudaMemcpyHostToDevice));
+	CUDA_CHECK(cudaMemcpy(device_spheres, spheres.data(), sizeof(Sphere) * spheres.size(), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMemcpy(device_planes, planes, sizeof(planes), cudaMemcpyHostToDevice));
 	CUDA_CHECK(cudaMemcpy(device_materials, materials, sizeof(materials), cudaMemcpyHostToDevice));
 
@@ -521,7 +549,7 @@ int main() {
 		device_framebuffer,
 		cam,
 		device_spheres,
-		int(sizeof(spheres) / sizeof(spheres[0])),
+		int(spheres.size()),
 		device_planes,
 		int(sizeof(planes) / sizeof(planes[0])),
 		device_materials,
